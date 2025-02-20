@@ -1,0 +1,112 @@
+
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.animation as animation
+from matplotlib.widgets import Slider, Button
+
+# Sample data
+sizes = [30, 20, 25, 15, 10]
+labels = ['Category A', 'Category B', 'Category C', 'Category D', 'Category E']
+colors = ['#ff9999', '#66b3ff', '#99ff99', '#ffcc99', '#ff99cc']
+
+# Create the figure and 3D axes
+fig = plt.figure(figsize=(12, 8))
+ax = fig.add_subplot(111, projection='3d')
+
+# Add slider axes
+plt.subplots_adjust(bottom=0.25)
+slider_ax = plt.axes([0.2, 0.1, 0.6, 0.03])
+height_slider = Slider(slider_ax, 'Height', 0.1, 1.0, valinit=0.3)
+
+# Function to create points for wedges
+def wedge_points(startangle, angle, radius=1, height=0.3):
+    x = np.array([0, radius*np.cos(startangle), radius*np.cos(startangle + angle), 0])
+    y = np.array([0, radius*np.sin(startangle), radius*np.sin(startangle + angle), 0])
+    z = np.array([0, 0, 0, 0])
+    return x, y, z
+
+# Function to update the pie chart
+def update_pie_chart(height):
+    ax.clear()
+    start_angle = 0
+    
+    for size, color, label in zip(sizes, colors, labels):
+        angle = 2 * np.pi * size / sum(sizes)
+        
+        # Bottom of the wedge
+        x, y, z = wedge_points(start_angle, angle, height=height)
+        verts = [list(zip(x, y, z))]
+        ax.add_collection3d(plt.Poly3DCollection(verts, facecolor=color, alpha=0.8))
+        
+        # Top of the wedge
+        z = np.full_like(z, height)
+        verts = [list(zip(x, y, z))]
+        ax.add_collection3d(plt.Poly3DCollection(verts, facecolor=color, alpha=0.8))
+        
+        # Side of the wedge
+        for i in range(len(x)-1):
+            x_side = [x[i], x[i+1], x[i+1], x[i]]
+            y_side = [y[i], y[i+1], y[i+1], y[i]]
+            z_side = [0, 0, height, height]
+            verts = [list(zip(x_side, y_side, z_side))]
+            ax.add_collection3d(plt.Poly3DCollection(verts, facecolor=color, alpha=0.8))
+        
+        # Add label
+        label_angle = start_angle + angle/2
+        label_x = 1.2 * np.cos(label_angle)
+        label_y = 1.2 * np.sin(label_angle)
+        ax.text(label_x, label_y, height/2, f'{label}\n({size}%)', 
+                horizontalalignment='center', verticalalignment='center')
+        
+        start_angle += angle
+    
+    ax.set_xlim(-1.5, 1.5)
+    ax.set_ylim(-1.5, 1.5)
+    ax.set_zlim(0, max(1.0, height + 0.2))
+    ax.set_axis_off()
+    plt.title('Interactive 3D Pie Chart', pad=10, y=0.95)
+
+# Animation update function
+def animate(frame):
+    ax.view_init(elev=20, azim=frame)
+    return fig,
+
+# Create the animation
+anim = animation.FuncAnimation(fig, animate, frames=np.linspace(0, 360, 180),
+                             interval=50, blit=True)
+
+# Slider update function
+def update_height(val):
+    update_pie_chart(val)
+    fig.canvas.draw_idle()
+
+height_slider.on_changed(update_height)
+
+# Add a play/pause button for animation
+button_ax = plt.axes([0.85, 0.1, 0.1, 0.03])
+button = Button(button_ax, 'Play/Pause')
+animation_running = True
+
+def toggle_animation(event):
+    global animation_running
+    if animation_running:
+        anim.event_source.stop()
+    else:
+        anim.event_source.start()
+    animation_running = not animation_running
+
+button.on_clicked(toggle_animation)
+
+# Initial plot
+update_pie_chart(0.3)
+
+# Enable mouse rotation
+def on_mouse_move(event):
+    if event.inaxes == ax:
+        ax.view_init(elev=ax.elev + event.ydata/50, azim=ax.azim + event.xdata/50)
+        fig.canvas.draw_idle()
+
+fig.canvas.mpl_connect('motion_notify_event', on_mouse_move)
+
+plt.show()
